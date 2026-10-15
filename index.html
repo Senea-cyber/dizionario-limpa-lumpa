@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Traduttore Limpa Lumpa</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f7f5ff;color:#222}
+header{background:linear-gradient(135deg,#6d28d9,#8b5cf6);color:#fff;padding:22px}
+.wrap{max-width:1000px;margin:auto;padding:20px}
+h1{margin:0 0 6px}.sub{opacity:.9}.card{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:20px;box-shadow:0 10px 28px rgba(0,0,0,.08)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:18px}label{font-weight:800;display:block;margin-bottom:8px}
+textarea{width:100%;min-height:180px;border:2px solid #ddd;border-radius:16px;padding:14px;font-size:18px;resize:vertical;box-sizing:border-box}
+textarea:focus{outline:none;border-color:#7c3aed}.controls{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+button{border:0;border-radius:14px;padding:12px 16px;font-weight:800;cursor:pointer}.primary{background:#7c3aed;color:#fff}.secondary{background:#ede9fe;color:#5b21b6}
+.badge{display:inline-block;background:#ede9fe;color:#5b21b6;border-radius:999px;padding:7px 10px;font-weight:800;margin-top:8px}
+.note{margin-top:14px;color:#666;font-size:14px}.status{margin-top:10px;font-weight:700}
+@media(max-width:700px){.row{grid-template-columns:1fr}}
+</style></head>
+<body>
+<header><div class="wrap" style="padding:0"><h1>🍭 Traduttore Limpa Lumpa</h1><div class="sub">Italiano ↔ Limpa Lumpa</div></div></header>
+<div class="wrap"><div class="card">
+<div class="row"><div><label id="labA">Italiano</label><textarea id="a" placeholder="Scrivi una parola o frase..."></textarea></div>
+<div><label id="labB">Limpa Lumpa</label><textarea id="b" readonly placeholder="Traduzione..."></textarea></div></div>
+<div class="controls"><button class="primary" onclick="translateNow()">Traduci</button><button class="secondary" onclick="swapLang()">⇄ Scambia lingue</button><button class="secondary" onclick="clearAll()">Pulisci</button><button class="secondary" onclick="speakOut()">🔊 Leggi traduzione</button></div>
+<div class="badge" id="badge">Caricamento dizionario…</div><div class="status" id="status"></div>
+<div class="note">Gli articoli e le preposizioni italiane vengono eliminati nella traduzione verso Limpa Lumpa. I verbi restano nella forma Limpa Lumpa invariata.</div>
+</div></div>
+<script>
+const SOURCE='dizionario_limpa_lumpa_interattivo_solo_parole (6).html';
+let DATA=[],IT2LL={},LL2IT={},PHRASES=[],direction='it-ll';
+
+const DROP=new Set(["il","lo","la","i","gli","le","un","uno","una","l'","a","di","da","in","per","su","tra","fra","con","senza","al","allo","alla","ai","agli","alle","del","dello","della","dei","degli","delle","dal","dallo","dalla","dai","dagli","dalle","nel","nello","nella","nei","negli","nelle","sul","sullo","sulla","sui","sugli","sulle","col","coi"]);
+const VERBS={"voglio":"volere","vuoi":"volere","vuole":"volere","vogliamo":"volere","volete":"volere","vogliono":"volere","mangio":"mangiare","mangi":"mangiare","mangia":"mangiare","mangiamo":"mangiare","mangiate":"mangiare","mangiano":"mangiare","bevo":"bere","bevi":"bere","beve":"bere","beviamo":"bere","bevete":"bere","bevono":"bere","vado":"andare","vai":"andare","va":"andare","andiamo":"andare","andate":"andare","vanno":"andare","vengo":"venire","vieni":"venire","viene":"venire","veniamo":"venire","venite":"venire","vengono":"venire","faccio":"fare","fai":"fare","fa":"fare","facciamo":"fare","fate":"fare","fanno":"fare","dico":"dire","dici":"dire","dice":"dire","diciamo":"dire","dite":"dire","dicono":"dire","parlo":"parlare","parli":"parlare","parla":"parlare","parliamo":"parlare","parlate":"parlare","parlano":"parlare","dormo":"dormire","dormi":"dormire","dorme":"dormire","dormiamo":"dormire","dormite":"dormire","dormono":"dormire","gioco":"giocare","giochi":"giocare","gioca":"giocare","giochiamo":"giocare","giocate":"giocare","giocano":"giocare","studio":"studiare","studi":"studiare","studia":"studiare","studiamo":"studiare","studiate":"studiare","studiano":"studiare","leggo":"leggere","leggi":"leggere","legge":"leggere","leggiamo":"leggere","leggete":"leggere","leggono":"leggere","scrivo":"scrivere","scrivi":"scrivere","scrive":"scrivere","scriviamo":"scrivere","scrivete":"scrivere","scrivono":"scrivere","compro":"comprare","compri":"comprare","compra":"comprare","compriamo":"comprare","comprate":"comprare","comprano":"comprare","pago":"pagare","paghi":"pagare","paga":"pagare","paghiamo":"pagare","pagate":"pagare","pagano":"pagare","costo":"costare","costi":"costare","costa":"costare","costiamo":"costare","costate":"costare","costano":"costare","valgo":"valere","vali":"valere","vale":"valere","valiamo":"valere","valete":"valere","valgono":"valere","sono":"essere","sei":"essere","è":"essere","siamo":"essere","siete":"essere","ho":"avere","hai":"avere","ha":"avere","abbiamo":"avere","avete":"avere","hanno":"avere"};
+const PATCH={"nonno":"piemi piemi","tuo":"et","tua":"ter","auto":"wakù","valere":"kashò","vale":"kashò","valore":"kashira","prezzo":"noparè","costo":"brikù","costare":"brikà","soldi":"monkè","euro":"eurak","pagare":"tulakà","pagamento":"tulakar","caro":"zorant","economico":"pishè","gratis":"nulak","sconto":"frapè","offerta":"wakish","totale":"tumara","quantità":"mokantè","abbastanza":"nashò","più":"kirè","meno":"shupè","diverso":"farakù","pure":"ankù","mentre":"mishè","insieme":"polant","ancora":"wanù","già":"yepà","subito":"tikù","poi":"tarnè","però":"mapè","magari":"wishà","quasi":"quashè","davvero":"wirà","solo":"solù","forse":"mishà","certo":"sharè","presto":"shikè","tardi":"womarè","fuori":"ushà","dentro":"intara","così":"cikè","allora":"tanò","comunque":"wankè","invece":"venkè","qualcosa":"mashant","qualcuno":"chimant","nessuno":"nichim","ogni":"tamak","stesso":"semmù"};
+
+function rebuild(){
+  IT2LL={};LL2IT={};
+  for(const x of DATA){if(!x.it||!x.ll)continue;IT2LL[x.it.toLowerCase()]=x.ll;LL2IT[x.ll.toLowerCase()]=x.it}
+  for(const [k,v] of Object.entries(PATCH)){IT2LL[k]=v;LL2IT[v.toLowerCase()]=k}
+  PHRASES=Object.entries(IT2LL).sort((a,b)=>b[0].split(' ').length-a[0].split(' ').length);
+  badge.textContent=(Object.keys(IT2LL).length)+' voci caricate';
+}
+async function loadData(){
+  try{
+    const txt=await fetch(SOURCE).then(r=>r.text());
+    const mm=txt.match(/const DATA=(\[.*?\]);const cats/s) || txt.match(/const DATA=(\[.*?\]);/s);
+    if(!mm)throw new Error('DATA non trovato');
+    DATA=JSON.parse(mm[1]);rebuild();status.textContent='Dizionario caricato.';
+  }catch(e){status.textContent='Errore nel caricamento del dizionario: '+e.message}
+}
+function preservePunct(original, translated){const end=(original.match(/[?!.,;:]+$/)||[''])[0];return translated+end}
+function translateIT(text){
+  let raw=text.trim();if(!raw)return '';
+  const key=raw.toLowerCase().replace(/[?!.,;:]+$/,'').trim();
+  if(IT2LL[key])return preservePunct(raw,IT2LL[key]);
+  let working=raw.toLowerCase();
+  for(const [it,ll] of PHRASES){if(it.split(' ').length<2)continue;const esc=it.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');working=working.replace(new RegExp('\\b'+esc+'\\b','gi'),'§'+ll+'§')}
+  const toks=working.split(/(\s+|[?!.,;:])/).filter(Boolean),out=[];
+  for(const tok of toks){
+    if(/^\s+$/.test(tok)||/^[?!.,;:]$/.test(tok)){out.push(tok);continue}
+    if(tok.startsWith('§')&&tok.endsWith('§')){out.push(tok.slice(1,-1));continue}
+    const low=tok.toLowerCase();if(DROP.has(low))continue;const lemma=VERBS[low]||low;out.push(IT2LL[lemma]||IT2LL[low]||tok)
+  }
+  return out.join(' ').replace(/\s+([?!.,;:])/g,'$1').replace(/\s+/g,' ').trim()
+}
+function translateLL(text){
+  const raw=text.trim();if(!raw)return '';
+  const key=raw.toLowerCase().replace(/[?!.,;:]+$/,'').trim();if(LL2IT[key])return preservePunct(raw,LL2IT[key]);
+  return raw.split(/(\s+|[?!.,;:])/).map(tok=>(/^\s+$/.test(tok)||/^[?!.,;:]$/.test(tok))?tok:(LL2IT[tok.toLowerCase()]||tok)).join('').replace(/\s+([?!.,;:])/g,'$1')
+}
+function translateNow(){b.value=direction==='it-ll'?translateIT(a.value):translateLL(a.value)}
+function swapLang(){direction=direction==='it-ll'?'ll-it':'it-ll';labA.textContent=direction==='it-ll'?'Italiano':'Limpa Lumpa';labB.textContent=direction==='it-ll'?'Limpa Lumpa':'Italiano';const old=b.value;a.value=old;b.value=''}
+function clearAll(){a.value='';b.value=''}
+function speakOut(){if(!b.value)return;const u=new SpeechSynthesisUtterance(b.value);u.lang='it-IT';u.rate=.8;speechSynthesis.cancel();speechSynthesis.speak(u)}
+a.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();translateNow()}});
+loadData();
+</script></body></html>

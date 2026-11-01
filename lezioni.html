@@ -22,7 +22,7 @@ input,select{border:1px solid #c9bfe0;max-width:100%}
 #feedback{min-height:24px;font-weight:600}
 #certificate{border:3px double #7042cc;text-align:center;padding:28px}
 @media(max-width:580px){.wrap{padding:12px}.card{padding:14px}}
-</style></head>
+.teacher{background:linear-gradient(135deg,#fff9ff,#f0e9ff);border:1px solid #d8caf5;border-radius:16px;padding:18px;margin-bottom:16px}.teacher h3{margin:0 0 10px}.teacher p{line-height:1.55}#teacherExamples p{background:white;padding:9px;border-radius:9px;margin:7px 0}</style></head>
 <body><header><div class="wrap"><nav><a href="./">← Traduttore</a><a href="./nuove-parole.html">Nuove parole</a></nav>
 <h1>🍭 Limpa Lingo</h1><p>Impara tutte le parole del dizionario, supera le lezioni e conquista il titolo di <b>Madrelingua Limpa Lumpa</b>!</p></div></header>
 <main class="wrap">
@@ -30,7 +30,7 @@ input,select{border:1px solid #c9bfe0;max-width:100%}
 <p class="small">Ogni capitolo contiene fino a 80 voci del dizionario e una verifica da 10 domande: servono almeno 8 risposte esatte. Dopo tutti i capitoli si sblocca l'esame finale da 30 domande: per superarlo servono almeno 27 risposte corrette. Il titolo è un riconoscimento del gioco, non una certificazione linguistica ufficiale.</p></section>
 <section class="card"><h2>Lezioni</h2><div id="levels" class="grid"></div></section>
 <section class="card"><h2 id="chapterTitle">Parole</h2><p id="chapterInfo" class="small"></p><input id="filter" type="search" placeholder="Cerca tra le parole di questa lezione" aria-label="Cerca parole" style="width:100%;margin-bottom:10px">
-<div id="words" class="words"></div><p><button id="start">Inizia la verifica</button></p></section>
+<div class="teacher"><h3>👩‍🏫 La professoressa Limpa ti spiega</h3><p id="teacherText"></p><div id="teacherExamples"></div><p><button id="listen">🔊 Ascolta tutta la lezione</button><button id="pauseVoice" class="alt">⏸ Pausa / Riprendi</button><button id="stopVoice" class="alt">⏹ Ferma</button></p><p id="voiceStatus" class="small" aria-live="polite"></p><button id="doneStudy" class="alt">✅ Ho studiato la lezione</button></div><h3>📚 Parole della lezione</h3><div id="words" class="words"></div><p><button id="start" disabled>🔒 Prima studia la lezione</button></p></section>
 <section class="card" id="quizCard" hidden><h2 id="quizTitle">Verifica</h2><div class="quiz"><div id="quizProgress"></div><p id="question"></p><label for="answer">Traduzione</label><p><input id="answer" autocomplete="off" placeholder="Scrivi qui la traduzione" style="width:100%"></p>
 <button id="check">Controlla</button><button id="next" hidden>Continua</button><p id="feedback" aria-live="polite"></p></div></section>
 <section class="card"><h2>Esame finale</h2><p id="finalStatus"></p><button id="finalStart" disabled>Inizia l'esame finale</button></section>
@@ -46,7 +46,7 @@ let passed=new Set((saved.passed||[]).filter(i=>Number.isInteger(i)&&i>=0&&i<CHA
 let best=Number(saved.best||0),current=0,session=null;
 const el=id=>document.getElementById(id);
 const tidy=s=>(s||'').trim().toLocaleLowerCase('it').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
-function save(){try{localStorage.setItem(STORE,JSON.stringify({passed:[...passed],best}))}catch(e){}}
+function save(){try{localStorage.setItem(STORE,JSON.stringify({passed:[...passed],best,heard:[...heard]}))}catch(e){}}
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function update(){
 el('summary').textContent=passed.size+' / '+CHAPTERS.length+' capitoli superati • '+ALL_WORDS.length+' voci disponibili';
@@ -61,8 +61,25 @@ el('finalStatus').textContent=unlocked?'Tutte le lezioni completate! Puoi sosten
 el('certificate').hidden=!(unlocked&&best>=27);
 el('scoreCertificate').textContent='Punteggio esame finale: '+best+'/30';
 }
-function select(i){current=i;el('chapterTitle').textContent='Lezione '+(i+1);el('chapterInfo').textContent='Studia le '+CHAPTERS[i].length+' traduzioni e poi affronta la verifica. Puoi ripeterla quanto vuoi.';
-el('filter').value='';renderWords();update()}
+let heard=new Set((saved.heard||[]).filter(i=>Number.isInteger(i)&&i>=0&&i<CHAPTERS.length));let speechCycle=0;
+function lesson(i){
+ const chapter=CHAPTERS[i];
+ const intro='Ciao ragazzi! Sono la professoressa Limpa. Benvenuti alla lezione '+(i+1)+'. Oggi impariamo '+chapter.length+' parole e forme. La regola importante è questa: in Limpa Lumpa il verbo resta uguale. Io parlo: mo ciro. Tu parli: toc ciro. Lui parla: et ciro. Lei parla: ter ciro. Adesso ascolta e ripeti con me.';
+ const phrases=chapter.map(([it,ll])=>'In italiano '+it+'. In Limpa Lumpa '+ll+'. Ripeti: '+ll+'.');
+ return {intro,phrases,outro:'Ottimo lavoro! Ora rileggi le parole, premi Ho studiato la lezione e affronta la verifica.'};
+}
+function stopSpeech(){speechCycle++;if('speechSynthesis' in window)speechSynthesis.cancel();el('voiceStatus').textContent='Audio fermato.'}
+function explain(){
+ if(!('speechSynthesis' in window)){el('voiceStatus').textContent='Lettura vocale non supportata: puoi leggere la spiegazione.';return}
+ stopSpeech();const cycle=speechCycle,l=lesson(current),pieces=[l.intro,...l.phrases,l.outro];let pos=0;
+ el('voiceStatus').textContent='👩‍🏫 La professoressa sta spiegando. Puoi mettere in pausa.';
+ function play(){if(cycle!==speechCycle)return;if(pos>=pieces.length){el('voiceStatus').textContent='Lezione ascoltata! Ora puoi segnare che hai studiato.';return}
+ const voice=new SpeechSynthesisUtterance(pieces[pos++]);voice.lang='it-IT';voice.rate=.85;voice.pitch=1.12;voice.onend=play;voice.onerror=()=>{el('voiceStatus').textContent='Audio non disponibile. Puoi leggere la spiegazione.'};speechSynthesis.speak(voice)}
+ play();
+}
+function refreshStudy(){el('start').disabled=!heard.has(current);el('start').textContent=heard.has(current)?'📝 Inizia la verifica':'🔒 Prima studia la lezione'}
+function select(i){stopSpeech();current=i;el('chapterTitle').textContent='Lezione '+(i+1);el('chapterInfo').textContent='Studia le '+CHAPTERS[i].length+' traduzioni e poi affronta la verifica. Puoi ripeterla quanto vuoi.';
+el('filter').value='';renderWords();const info=lesson(i);el('teacherText').textContent=info.intro;el('teacherExamples').textContent='';for(const [it,ll] of CHAPTERS[i].slice(0,8)){const p=document.createElement('p');p.textContent='👩‍🏫 '+it+' significa '+ll+'. Ripeti: '+ll;el('teacherExamples').append(p)}refreshStudy();update()}
 function renderWords(){const q=tidy(el('filter').value);el('words').textContent='';for(const [it,ll] of CHAPTERS[current]){if(q&&!tidy(it).includes(q)&&!tidy(ll).includes(q))continue;
 const d=document.createElement('div');d.className='word';const strong=document.createElement('strong');strong.textContent=it;d.append(strong,document.createElement('br'),document.createTextNode(ll));el('words').append(d)}}
 function begin(isFinal){const pool=isFinal?ALL_WORDS:CHAPTERS[current];const amount=isFinal?30:Math.min(10,pool.length);session={isFinal,items:shuffle([...pool]).slice(0,amount),step:0,correct:0,checked:false};
@@ -80,7 +97,7 @@ if(s.isFinal){best=Math.max(best,s.correct)}else if(success){passed.add(current)
 save();update();el('feedback').textContent=(success?'🎉 Superata! ':'Riprova! ')+'Hai risposto correttamente a '+s.correct+' domande su '+s.items.length+'.'+(s.isFinal&&success?' Sei Madrelingua Limpa Lumpa!':'');
 el('question').textContent='Verifica terminata';el('quizProgress').textContent='';el('answer').value='';el('answer').disabled=true;el('check').hidden=true;el('next').hidden=true;
 setTimeout(()=>{el('answer').disabled=false},0);session=null}
-el('filter').oninput=renderWords;el('start').onclick=()=>begin(false);el('finalStart').onclick=()=>{if(passed.size===CHAPTERS.length)begin(true)};
+el('filter').oninput=renderWords;el('listen').onclick=explain;el('pauseVoice').onclick=()=>{if(!('speechSynthesis' in window))return;if(speechSynthesis.paused)speechSynthesis.resume();else if(speechSynthesis.speaking)speechSynthesis.pause()};el('stopVoice').onclick=stopSpeech;el('doneStudy').onclick=()=>{heard.add(current);save();refreshStudy();el('voiceStatus').textContent='✅ Lezione studiata! Ora puoi fare la verifica.'};el('start').onclick=()=>{if(heard.has(current)){stopSpeech();begin(false)}};el('finalStart').onclick=()=>{if(passed.size===CHAPTERS.length)begin(true)};
 el('check').onclick=check;el('next').onclick=advance;el('answer').onkeydown=e=>{if(e.key==='Enter'){if(session&&!session.checked)check();else advance()}};
 el('printCert').onclick=()=>window.print();
 select(0);
